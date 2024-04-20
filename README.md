@@ -1,0 +1,2 @@
+# YOLOv5_PYQT5_GUI
+基于YOLOv5和PYQT5的检测界面
