@@ -67,7 +67,6 @@ class Ui_MainWindow(QMainWindow):
         self.btn_detect_img.setFont(font)
         self.btn_detect_img.setObjectName("btn_detect_img")
         self.btn_detect_img.clicked.connect(self.openImage)
-
         # 保存结果图像
         self.btn_save_img = QtWidgets.QPushButton(self.centralwidget)
         self.btn_save_img.setGeometry(QtCore.QRect(1125, 810, 112, 51))
@@ -108,64 +107,45 @@ class Ui_MainWindow(QMainWindow):
         self.setCentralWidget(self.centralwidget)
         self.retranslateUi(self.centralwidget)
         QtCore.QMetaObject.connectSlotsByName(self.centralwidget)
+        
+    # 图像检测函数    
     def detectImage(self, name_list, img):
         '''
         :param name_list: 文件名列表
         :param img: 待检测图片
         :return: info_show:检测输出的文字信息
         '''
-        print(24)
         showimg = img
-        print(25)
         with torch.no_grad():
-            print(26)
             img = letterbox(img, new_shape=self.opt.imgsz)[0]
             # Convert
-            print(27)
             img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
-            print(28)
             img = np.ascontiguousarray(img)
-            print(29)
             img = torch.from_numpy(img).to(self.device)
-            print(30)
             img = img.half() if self.opt.half else img.float()  # uint8 to fp16/32
-            print(31)
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
-            print(32)
             if len(img.shape) == 3:
-                print(33)
                 img = img[None]
-                print(34)
             # Inference
             pred = self.model(img, augment=self.opt.augment, visualize=self.opt.visualize)
-            print(35)
             # Apply NMS
             pred = non_max_suppression(pred, self.opt.conf_thres, self.opt.iou_thres, classes=self.opt.classes, agnostic=self.opt.agnostic_nms, max_det=self.opt.max_det)
-            print(36)
             info_show = ""
             # Process detections
             annotator = Annotator(img, line_width=self.opt.line_thickness, example=str(self.names))
-            print(37)
             for i, det in enumerate(pred):
-                print(38)
                 if det is not None and len(det):
-                    print(39)
                     # Rescale boxes from img_size to im0 size
                     det[:, :4] = scale_coords(img.shape[2:], det[:, :4], showimg.shape).round()
-                    print(40)
                     for *xyxy, conf, cls in reversed(det):
-                        print(41)
                         c = int(cls)
                         print(c)
-                        print(42)
                         label = None if self.opt.hide_labels else (self.names[c] if self.opt.hide_conf else f'{self.names[c]} {conf:.2f}')
-                        print(43)
                         name_list.append(self.names[int(cls)])
-                        print(44)
                         single_info = plot_one_box2(xyxy, showimg, label=label, color=self.colors[int(cls)], line_thickness=2)
-                        print(45)
                         print(single_info)
                         info_show = info_show + single_info + "\n"
+    # 模型选择函数                  
     def seletModels(self):
         self.openfile_name_model, _ = QFileDialog.getOpenFileName(self.btn_selet_model, '选择weights文件', '.', '权重文件(*.pt)')
         if not self.openfile_name_model:
@@ -173,9 +153,10 @@ class Ui_MainWindow(QMainWindow):
         else:
             print('加载weights文件地址为：' + str(self.openfile_name_model))
             QMessageBox.information(self, u"Notice", u"权重打开成功", buttons=QtWidgets.QMessageBox.Ok)
+            
+    # 模型初始化函数        
     def initModels(self):
         # 模型相关参数配置
-        print(1)
         parser = argparse.ArgumentParser()
         parser.add_argument('--weights', nargs='+', type=str, default='runs/train/exp/weights/best.pt', help='model path(s)')
         parser.add_argument('--source', type=str, default='data/applenew5/images/test/', help='file/dir/URL/glob, 0 for webcam')
@@ -203,85 +184,62 @@ class Ui_MainWindow(QMainWindow):
         parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
         parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
         parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
-        print(2)
         self.opt = parser.parse_args()
-        print(3)
         print(self.opt)
-        print(4)
         # 默认使用opt中的设置（权重等）来对模型进行初始化
         source, weights, view_img, save_txt, imgsz, half, data, dnn, visualize, max_det = \
             self.opt.source, self.opt.weights, self.opt.view_img, self.opt.save_txt, self.opt.imgsz, self.opt.half, self.opt.data, self.opt.dnn, self.opt.visualize, self.opt.max_det
-        print(5)
         # 若openfile_name_model不为空，则使用此权重进行初始化
         if self.openfile_name_model:
-            print(6)
             weights = self.openfile_name_model
-            print(7)
             print("Using button choose model")
-        print(8)
         self.device = select_device(self.opt.device)
-        print(9)
         cudnn.benchmark = True
-        print(10)
         # Load model
         self.model = DetectMultiBackend(weights, device=self.device, dnn=self.opt.dnn, data=self.opt.data, fp16=half)
-        print(11)
         stride = self.model.stride # model stride
-        print(12)
         self.imgsz = check_img_size(imgsz, s=stride)  # check img_size
-        print(13)
         # Get names and colors
         self.names = self.model.names
         self.colors = [[random.randint(0, 255) for _ in range(3)] for _ in self.names]
-        print(14)
         print("model initial done")
         # 设置提示框
         QtWidgets.QMessageBox.information(self, u"Notice", u"模型加载完成", buttons=QtWidgets.QMessageBox.Ok,
                                       defaultButton=QtWidgets.QMessageBox.Ok)
-        print(15)
+    # 图像选择函数
     def openImage(self):
         print('openImage')
         name_list = []
-        print(16)
         fname, _ = QFileDialog.getOpenFileName(self, '打开文件', '.', '图像文件(*.jpg)')
         print(fname)
-        print(17)
         # if not fname:
         #     QMessageBox.warning(self, u"Warning", u"打开图片失败", buttons=QMessageBox.Ok)
         # else:
         self.label_show_yuanshi.setPixmap(QPixmap(fname))
-        print(18)
         self.label_show_yuanshi.setScaledContents(True)
-        print(19)
         img = cv2.imread(fname)
         print(img)
-        print(20)
         print("model initial done21")
         self.detectImage(name_list, img)
-        print(21)
         info_show = self.detectImage(name_list, img)
         print(info_show)
-        print("model initial done22")
         # 检测结果显示在界面
         print("model initial done23")
         self.result = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-        print("model initial done24")
         self.result = cv2.resize(self.result, (1000, 1000), interpolation=cv2.INTER_AREA)
-        print("model initial done25")
         self.QtImg = QImage(self.result.data, self.result.shape[1], self.result.shape[0], QImage.Format_RGB32)
         self.qImg = self.QtImg
-        print("model initial done26")
         self.label_show_jieguo.setPixmap(QtGui.QPixmap.fromImage(self.QtImg))
-        print(22)
         print(self.label_show_jieguo)
-        print("model initial done27")
         self.label_show_jieguo.setScaledContents(True)  # 设置图像自适应界面大小
-        print("model initial done28")
         return self.qImg
-        print(23)
+        
+    # 图像保存函数
     def saveImage(self):
         fd, _ = QFileDialog.getSaveFileName(self, "保存图片", ".", "*.jpg")
         self.qImg.save(fd)
+        
+    # 图像清除函数
     def clearImage(self, stopp):
         result = QMessageBox.question(self, "Warning:", "是否清除本次检测结果", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if result == QMessageBox.Yes:
@@ -289,6 +247,8 @@ class Ui_MainWindow(QMainWindow):
             self.label_show_jieguo.clear()
         else:
             stopp.ignore()
+            
+    # 应用退出函数
     def exitApp(self, event):
         event = QApplication.instance()
         result = QMessageBox.question(self, "Notice:", "您真的要退出此应用吗", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
@@ -296,6 +256,7 @@ class Ui_MainWindow(QMainWindow):
             event.quit()
         else:
             event.ignore()
+            
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
@@ -308,6 +269,7 @@ class Ui_MainWindow(QMainWindow):
         self.btn_exit_app.setText(_translate("MainWindow", "退出应用"))
         self.label_show_jieguo.setText(_translate("MainWindow", "<html><head/><body><p align=\"center\"><span style=\" font-size:16pt;\">结果图像</span></p></body></html>"))
         self.label_show_title.setText(_translate("MainWindow", "<html><head/><body><p align=\"center\"><span style=\" font-size:26pt; color:#ffffff;\">基于YOLOv5的识别检测演示软件</span></p></body></html>"))
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     ui = Ui_MainWindow()
